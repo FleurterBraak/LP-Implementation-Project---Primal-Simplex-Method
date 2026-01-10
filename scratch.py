@@ -50,10 +50,15 @@ def solve(lp):
         if np.all(c_bar_N >= -epsilon):
             x = np.zeros(lp.num_columns)
             x[basis] = x_basis
+
+            if lp.sense == "minimize":
+                dual = y
+            elif lp.sense == "maximize":
+                dual = -y
             return {
                 "status": "optimal",
                 "primal": x,
-                "dual": None,
+                "dual": dual,
                 "ray": None,
                 "farkas": None,
                 "basis": basis}
@@ -73,7 +78,7 @@ def solve(lp):
         if np.all(d_B >= -epsilon):
             return {
                 "status": "unbounded",
-                "primal": x,
+                "primal": None,
                 "dual": None,
                 "ray": d,
                 "farkas": None,
@@ -112,6 +117,7 @@ with open(EXAMPLE_FILE) as f:
     print(f"farkas: {result['farkas']}")
     print(f"basis: {result['basis']}")
     print(f"objective value: {np.dot(np.array(lp.objective), result['primal'])}")
+    print(f"objective dual value: {np.dot(np.array([c['rhs'] for c in lp.constraints]), result['dual'])}")
     #print(f"Outcome: {outcome}")
     #if outcome.lower() == "optimal":
         #objective_value = np.dot(np.array(lp.objective), x)

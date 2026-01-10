@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def solve(lp):
     max_iterations = 10000
     epsilon = 1e-7
@@ -46,10 +45,16 @@ def solve(lp):
         if np.all(c_bar_N >= -epsilon):
             x = np.zeros(lp.num_columns)
             x[basis] = x_basis
+
+            #dual solution
+            if lp.sense == "minimize":
+                dual = y
+            elif lp.sense == "maximize":
+                dual = -y
             return {
                 "status": "optimal",
                 "primal": x,
-                "dual": None,
+                "dual": dual,
                 "ray": None,
                 "farkas": None,
                 "basis": basis}
@@ -69,7 +74,7 @@ def solve(lp):
         if np.all(d_B >= -epsilon):
             return {
                 "status": "unbounded",
-                "primal": x,
+                "primal": None,
                 "dual": None,
                 "ray": d,
                 "farkas": None,
