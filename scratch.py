@@ -1,6 +1,5 @@
 #In deze file kunnen we lekker klooien zonder dat we werkende codes verpesten jeej
 
-import numpy as np
 from lp import LP
 import numpy as np
 import json
