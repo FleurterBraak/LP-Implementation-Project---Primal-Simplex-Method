@@ -1,12 +1,31 @@
 import numpy as np
 
-def solve(lp):
-    max_iterations = 10000
-    epsilon = 1e-7
+epsilon = 1e-7
 
+# Add artificial variables to find a feasible basis
+# We are minimizing sum(a) s.t. Ax + Ia = b
+def compute_feasable_solution(lp, A, b):
+    num_constraints = lp.num_rows
+
+    # Append a m*m identity matrix to A
+    A_p1 = np.hstack([A, np.eye(num_constraints)])
+    # We are minimizing sum(a)
+    c_p1 = np.concatenate([np.zeros(lp.num_columns), np.ones(num_constraints)])
+    # Set initial basis to the indices of artificial variables
+    basis_p1 = np.arange(lp.num_columns, lp.num_columns + num_constraints)
+    
+    # Solve Phase I (minimizing sum of artificial variables)
+    result = solve_with_basis(A_p1, b, c_p1, basis_p1, True) 
+    basis = result['basis']
+    return basis
+
+def solve(lp):
     # Maximisation problem
     c = np.array(lp.objective)
-    if lp.sense == 'maximize':
+    
+    # Decide whether this is a minimisation problem
+    minimize = lp.sense == 'minimize'
+    if not minimize:
         c = -c
 
     # Init matrix A and rhs vector b
@@ -22,13 +41,17 @@ def solve(lp):
     if lp.has_basis:
         basis = np.array(lp.basis)
     else:
-        # TODO
-        pass
-    print(f"Basis: {basis}")
+        basis = compute_feasable_solution(lp, A, b)
+
+    return solve_with_basis(A, b, c, basis, minimize)
+
+
+def solve_with_basis(A, b, c, basis, minimize=True):
+    max_iterations = 10000
 
     for _ in range(max_iterations):
         # Line 2
-        N = np.setdiff1d(np.arange(lp.num_columns), basis)
+        N = np.setdiff1d(np.arange(A.shape[1]), basis)
 
         # Line 3
         A_basis = A[:, basis]
@@ -43,13 +66,12 @@ def solve(lp):
 
         # Line 5
         if np.all(c_bar_N >= -epsilon):
-            x = np.zeros(lp.num_columns)
+            x = np.zeros(A.shape[1])
             x[basis] = x_basis
 
-            #dual solution
-            if lp.sense == "minimize":
+            if minimize:
                 dual = y
-            elif lp.sense == "maximize":
+            else: # Maximize
                 dual = -y
             return {
                 "status": "optimal",
@@ -57,7 +79,8 @@ def solve(lp):
                 "dual": dual,
                 "ray": None,
                 "farkas": None,
-                "basis": basis}
+                "basis": basis
+            }
 
         # Line 6
         entering_candidates = N[c_bar_N < -epsilon]
@@ -66,7 +89,7 @@ def solve(lp):
         # Line 7
         A_k = A[:, k]
         d_B = np.linalg.solve(A_basis, -A_k)
-        d = np.zeros(lp.num_columns)
+        d = np.zeros(A.shape[1])
         d[basis] = d_B
         d[k] = 1.0
 
@@ -78,7 +101,8 @@ def solve(lp):
                 "dual": None,
                 "ray": d,
                 "farkas": None,
-                "basis": basis}
+                "basis": basis
+            }
 
         # Line 9
         j_mask = d_B < -epsilon
@@ -94,7 +118,7 @@ def solve(lp):
 
     return {
         "status": "limit reached",
-        "primal": x,
+        "primal": None,
         "dual": None,
         "ray": None,
         "farkas": None,

@@ -3,13 +3,16 @@ from lp import LP
 import numpy as np
 import json
 
-EXAMPLE_FILE = "examples/BT-Example-3.6-std.json"
+EXAMPLE_FILE = "examples/orig-basis-scagr25.json"
 with open(EXAMPLE_FILE) as f:
     data = json.load(f)
     lp = LP(data)
-    print(lp.constraints)
-    outcome, x, dir = solve(lp)
-    print(f"Outcome: {outcome}")
-    if outcome.lower() == "optimal":
-        objective_value = np.dot(np.array(lp.objective), x)
-        print(f"Value: {objective_value}")
+    result = solve(lp)
+    print(f"status: {result['status']}")
+    print(f'primal: {result['primal']}')
+    print(f"dual: {result['dual']}")
+    print(f"ray: {result['ray']}")
+    print(f"farkas: {result['farkas']}")
+    print(f"basis: {result['basis']}")
+    print(f"objective value: {np.dot(np.array(lp.objective), result['primal'])}")
+    print(f"objective dual value: {np.dot(np.array([c['rhs'] for c in lp.constraints]), result['dual'])}")
