@@ -20,18 +20,50 @@ def compute_feasable_solution(A, b):
     basis = result['basis']
     return basis
 
-def remove_redundant_rows(A, b):
-    # QR decomposition with pivoting: A.T * P = Q * R
-    # Use A transpose because we want to find linearly independent *rows* of A
-    Q, R, P = scipy.linalg.qr(A.T, pivoting=True)
-    
-    # The rank is the number of non-zero diagonal elements in R
-    rank = np.sum(np.abs(np.diag(R)) > epsilon)
-    
-    # P[:rank] contains the indices of the linearly independent rows
-    independent_row_indices = sorted(P[:rank])
-    
-    return A[independent_row_indices, :], b[independent_row_indices]
+def remove_artificial_variables(A, b, basis, num_original_vars):
+    # Use a while loop because the size of basis and python is too stupid to count for this
+    i = 0
+    while i < len(basis):
+        if basis[i] < num_original_vars: 
+            i+=1
+            continue
+
+        m_current = A.shape[0]
+        
+        # Construct the augmented matrix for current dimensions
+        # Columns 0 to n-1 are original, columns n to n+m_current-1 are artificials
+        A_aug = np.hstack([A, np.eye(m_current)])
+        
+        # Extract current basis matrix
+        A_B = A_aug[:, basis]
+        
+        # Compute lambda (the i-th row of the basis inverse)
+        e_i = np.zeros(m_current)
+        e_i[i] = 1.0
+        l = np.linalg.solve(A_B.T, e_i)
+
+        # 2. Search for an original variable k to replace the artificial one
+        found_replacement = False
+        for k in range(num_original_vars):
+            if k in basis: continue
+            # Check condition: lambda.T * A_k != 0
+            if np.abs(np.dot(l, A[:, k])) > epsilon:
+                basis[i] = k
+                found_replacement = True
+                break
+        
+        # 3. Handle rank deficit (redundant row)
+        if not found_replacement:
+            # According to Prop 14.5: rank(A_N\{l}) < m
+            # Delete the redundant row from A and b, and drop this basis entry
+            A = np.delete(A, i, axis=0)
+            b = np.delete(b, i)
+            basis = np.delete(basis, i)
+            # Don't increment i since we have removed current index
+            continue
+        i += 1
+        
+    return A, b, basis
 
 def solve(lp):
     # Decide whether this is a minimisation problem
@@ -48,9 +80,6 @@ def solve(lp):
             A[i, j] = float(coefficient)
     b = np.array([c['rhs'] for c in lp.constraints])
 
-    # Remove linearly dependent rows
-    A, b = remove_redundant_rows(A, b)
-
     # Ensure b >= 0 for phase I feasability
     for i in range(len(b)):
         if b[i] < 0:
@@ -63,6 +92,7 @@ def solve(lp):
         basis = np.array(lp.basis)
     else:
         basis = compute_feasable_solution(A, b)
+        A, b, basis = remove_artificial_variables(A, b, basis, lp.num_columns)
 
     return solve_with_basis(A, b, c, basis, minimize)
 
